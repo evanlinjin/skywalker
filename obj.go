@@ -6,17 +6,27 @@ type Obj struct {
 	prev *Obj
 	next *Obj
 
-	value *skyobject.Value
+	p interface{}
+	v *skyobject.Value
 
-	refMember string
-	refIndex  int // -1 if single reference (not array).
+	fn    string
+	index int // -1 if single reference (not array).
 }
 
-func NewObj(v *skyobject.Value) *Obj {
+func NewObj(v *skyobject.Value, p interface{}) *Obj {
 	return &Obj{
-		value: v,
-		refIndex: -1,
+		p:     p,
+		v:     v,
+		index: -1,
 	}
+}
+
+func (o *Obj) Generate(v *skyobject.Value, p interface{}, fn string, i int) *Obj {
+	newO := NewObj(v, p)
+	o.next = newO
+	o.fn = fn
+	o.index = i
+	return newO
 }
 
 //func Ha() {
