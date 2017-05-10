@@ -46,7 +46,7 @@ func (w *Walker) Clear() {
 }
 
 // Helper function. Obtains top-most object from internal stack.
-func (w *Walker) top() (*Obj, error) {
+func (w *Walker) peek() (*Obj, error) {
 	if w.Size() == 0 {
 		return nil, ErrEmptyInternalStack
 	}
@@ -84,7 +84,7 @@ func (w *Walker) AdvanceFromRoot(p interface{}, finder Finder) error {
 			if e := encoder.DeserializeRaw(v.Data(), p); e != nil {
 				return e
 			}
-			obj := NewObj(v, p, finder, "", i)
+			obj := NewObj(v.Schema().Reference(), p, finder, "", i)
 			w.stack = append(w.stack, obj)
 			return nil
 		}
@@ -106,7 +106,7 @@ func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Fi
 	}
 
 	// Obtain top-most object from internal stack.
-	obj, e := w.top()
+	obj, e := w.peek()
 	if e != nil {
 		return e
 	}
@@ -143,7 +143,7 @@ func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Fi
 				return e
 			}
 			// Add to stack.
-			newObj := obj.Generate(v, p, finder, fieldName, i)
+			newObj := obj.Generate(v.Schema().Reference(), p, finder, fieldName, i)
 			w.stack = append(w.stack, newObj)
 			return nil
 		}
@@ -165,7 +165,7 @@ func (w *Walker) AdvanceFromRefField(fieldName string, p interface{}) error {
 	}
 
 	// Obtain top-most object from internal stack.
-	obj, e := w.top()
+	obj, e := w.peek()
 	if e != nil {
 		return e
 	}
@@ -199,7 +199,7 @@ func (w *Walker) AdvanceFromRefField(fieldName string, p interface{}) error {
 		return e
 	}
 	// Add to internal stack.
-	newObj := obj.Generate(v, p, nil, fieldName, -1)
+	newObj := obj.Generate(v.Schema().Reference(), p, nil, fieldName, -1)
 	w.stack = append(w.stack, newObj)
 	return nil
 }
@@ -218,7 +218,7 @@ func (w *Walker) AdvanceFromDynamicField(fieldName string, p interface{}) error 
 	}
 
 	// Obtain top-most object from internal stack.
-	obj, e := w.top()
+	obj, e := w.peek()
 	if e != nil {
 		return e
 	}
@@ -241,10 +241,65 @@ func (w *Walker) AdvanceFromDynamicField(fieldName string, p interface{}) error 
 		return e
 	}
 	// Add to internal stack.
-	newObj := obj.Generate(v, p, nil, fieldName, -1)
+	newObj := obj.Generate(v.Schema().Reference(), p, nil, fieldName, -1)
 	w.stack = append(w.stack, newObj)
 	return nil
 }
+
+// Retreat retreats one from the internal stack.
+func (w *Walker) Retreat() {
+	switch w.Size() {
+	case 0:
+		return
+	case 1:
+		w.stack = []*Obj{}
+	default:
+		w.stack = w.stack[:len(w.stack)-1]
+		w.stack[len(w.stack)-1].next = nil
+	}
+}
+
+// TODO: Implement.
+// AppendToRefsField
+// ReplaceInRefsField
+// DeleteInRefsField
+//
+// ReplaceInRefField
+func (w *Walker) ReplaceInRefField(fieldName string, p interface{}) error {
+	gMux.Lock()
+	defer gMux.Unlock()
+
+	// Obtain top-most object.
+	tObj, e := w.peek()
+	if e != nil {
+		return e
+	}
+
+	// Save new obj.
+	nRef := w.c.Save(p)
+	if e := tObj.ReplaceReferenceField(fieldName, nRef); e != nil {
+		return e
+	}
+
+	// Recursively save.
+	lRef, e := tObj.Save(w.c)
+	if e != nil {
+		return e
+	}
+
+	// Replace root's direct child.
+	r := w.c.LastRoot(w.rpk)
+
+	rDyns := r.Refs()
+	rDyns[w.stack[0].prevInFieldIndex].Object = lRef
+	fmt.Println("RUNNING: r.Replace(rDyns)")
+	r.Replace(rDyns)
+	fmt.Println("DONE: r.Replace(rDyns)")
+
+	return nil
+}
+
+// ReplaceInDynamicField
 
 func (w *Walker) String() (out string) {
 	tabs := func(n int) {
@@ -259,13 +314,19 @@ func (w *Walker) String() (out string) {
 	}
 	out += fmt.Sprintf(".Refs[%d] ->\n", w.stack[0].prevInFieldIndex)
 	for i, obj := range w.stack {
+		schName := ""
+		s, _ := w.c.CoreRegistry().SchemaByReference(obj.s)
+		if s != nil {
+			schName = s.Name()
+		}
+
 		tabs(i)
-		out += fmt.Sprintf("  %s", obj.value.Schema().Name())
+		out += fmt.Sprintf("  %s", schName)
 		out += fmt.Sprintf(` = "%v"`+"\n", obj.p)
 
 		tabs(i)
 		if obj.next != nil {
-			out += fmt.Sprintf("  %s", obj.value.Schema().Name())
+			out += fmt.Sprintf("  %s", schName)
 			out += fmt.Sprintf(".%s", obj.next.prevFieldName)
 			if obj.next.prevInFieldIndex != -1 {
 				out += fmt.Sprintf("[%d]", obj.next.prevInFieldIndex)

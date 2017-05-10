@@ -15,19 +15,19 @@ type Board struct {
 
 type Thread struct {
 	Name    string
-	Creator skyobject.Reference `skyobject:"schema=Person"`
-	Posts skyobject.References `skyobject:"schema=Post"`
+	Creator skyobject.Reference  `skyobject:"schema=Person"`
+	Posts   skyobject.References `skyobject:"schema=Post"`
 }
 
 type Post struct {
-	Title string
-	Body string
+	Title  string
+	Body   string
 	Author skyobject.Reference `skyobject:"schema=Person"`
 }
 
 type Person struct {
 	Name string
-	Age uint64
+	Age  uint64
 }
 
 // GENERATES:
@@ -71,7 +71,6 @@ func fillContainer1(c *skyobject.Container, pk cipher.PubKey, sk cipher.SecKey) 
 	)
 	posts3 := r.SaveArray(
 		Post{"Test", "Yeah...", persons[2]},
-
 	)
 	threads := r.SaveArray(
 		Thread{"Greetings", persons[0], posts1},
@@ -258,4 +257,31 @@ func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 		}
 		t.Log("\n", w.String())
 	})
+}
+
+func TestWalker_ReplaceInRefField(t *testing.T) {
+	pk, sk := genKeyPair()
+	c := newContainer()
+	fillContainer1(c, pk, sk)
+	w, _ := NewWalker(c, pk, sk)
+
+	board := &Board{}
+	e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
+		if v.Schema().Name() != "Board" {
+			return false
+		}
+		fv, _ := v.FieldByName("Name")
+		s, _ := fv.String()
+		return s == "Talk"
+	})
+	if e != nil {
+		t.Error("advance from root failed:", e)
+	}
+	t.Log(w.String())
+
+	e = w.ReplaceInRefField("Creator", Person{"Donald Trump", 70})
+	if e != nil {
+		t.Error("failed to replace:", e)
+	}
+	t.Log(w.String())
 }
