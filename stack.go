@@ -2,6 +2,7 @@ package skywalker
 
 import (
 	"errors"
+	"fmt"
 	"github.com/skycoin/cxo/skyobject"
 	"github.com/skycoin/skycoin/src/cipher"
 	"github.com/skycoin/skycoin/src/cipher/encoder"
@@ -71,7 +72,7 @@ func (w *Walker) AdvanceFromRoot(p interface{}, finder Finder) error {
 	}
 
 	// Loop through direct children of root.
-	for _, dRef := range r.Refs() {
+	for i, dRef := range r.Refs() {
 		// See if it's the object needed with Finder.
 		v, e := r.ValueByDynamic(dRef)
 		if e != nil {
@@ -83,7 +84,7 @@ func (w *Walker) AdvanceFromRoot(p interface{}, finder Finder) error {
 			if e := encoder.DeserializeRaw(v.Data(), p); e != nil {
 				return e
 			}
-			obj := NewObj(v, p)
+			obj := NewObj(v, p, finder, "", i)
 			w.stack = append(w.stack, obj)
 			return nil
 		}
@@ -91,7 +92,7 @@ func (w *Walker) AdvanceFromRoot(p interface{}, finder Finder) error {
 	return ErrObjNotFound
 }
 
-// AdvanceFromRefsField advances from a field of name 'fieldName' and of type 'skyobject.References'.
+// AdvanceFromRefsField advances from a field of name 'prevFieldName' and of type 'skyobject.References'.
 // It uses a Finder implementation to find the child to advance to.
 // Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
 func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Finder) error {
@@ -142,7 +143,7 @@ func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Fi
 				return e
 			}
 			// Add to stack.
-			newObj := obj.Generate(v, p, fieldName, i)
+			newObj := obj.Generate(v, p, finder, fieldName, i)
 			w.stack = append(w.stack, newObj)
 			return nil
 		}
@@ -150,7 +151,7 @@ func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Fi
 	return ErrObjNotFound
 }
 
-// AdvanceFromRefField advances from a field of name 'fieldName' and type 'skyobject.Reference'.
+// AdvanceFromRefField advances from a field of name 'prevFieldName' and type 'skyobject.Reference'.
 // No Finder is required as field is a single reference.
 // Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
 func (w *Walker) AdvanceFromRefField(fieldName string, p interface{}) error {
@@ -198,7 +199,79 @@ func (w *Walker) AdvanceFromRefField(fieldName string, p interface{}) error {
 		return e
 	}
 	// Add to internal stack.
-	newObj := obj.Generate(v, p, fieldName, -1)
+	newObj := obj.Generate(v, p, nil, fieldName, -1)
 	w.stack = append(w.stack, newObj)
 	return nil
+}
+
+// AdvanceFromDynamicField advances from a field of name 'prevFieldName' and type 'skyobject.Dynamic'.
+// No Finder is required as field is a single reference.
+// Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
+func (w *Walker) AdvanceFromDynamicField(fieldName string, p interface{}) error {
+	gMux.Lock()
+	defer gMux.Unlock()
+
+	// Obtain root.
+	r := w.c.LastRoot(w.rpk)
+	if r == nil {
+		return ErrRootNotFound
+	}
+
+	// Obtain top-most object from internal stack.
+	obj, e := w.top()
+	if e != nil {
+		return e
+	}
+
+	// Obtain data from top-most object.
+	// Obtain field's value and schema name.
+	fDyn, e := obj.GetFieldAsDynamic(fieldName)
+	if e != nil {
+		return e
+	}
+
+	// Obtain value from root.
+	v, e := r.ValueByDynamic(fDyn)
+	if e != nil {
+		return e
+	}
+
+	// Deserialize.
+	if e := encoder.DeserializeRaw(v.Data(), p); e != nil {
+		return e
+	}
+	// Add to internal stack.
+	newObj := obj.Generate(v, p, nil, fieldName, -1)
+	w.stack = append(w.stack, newObj)
+	return nil
+}
+
+func (w *Walker) String() (out string) {
+	tabs := func(n int) {
+		for i := 0; i < n; i++ {
+			out += "\t"
+		}
+	}
+	out += fmt.Sprint("Root")
+	size := w.Size()
+	if size == 0 {
+		return
+	}
+	out += fmt.Sprintf(".Refs[%d] ->\n", w.stack[0].prevInFieldIndex)
+	for i, obj := range w.stack {
+		tabs(i)
+		out += fmt.Sprintf("  %s", obj.value.Schema().Name())
+		out += fmt.Sprintf(` = "%v"`+"\n", obj.p)
+
+		tabs(i)
+		if obj.next != nil {
+			out += fmt.Sprintf("  %s", obj.value.Schema().Name())
+			out += fmt.Sprintf(".%s", obj.next.prevFieldName)
+			if obj.next.prevInFieldIndex != -1 {
+				out += fmt.Sprintf("[%d]", obj.next.prevInFieldIndex)
+			}
+			out += fmt.Sprint(" ->\n")
+		}
+	}
+	return
 }

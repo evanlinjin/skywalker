@@ -10,26 +10,28 @@ type Obj struct {
 	prev *Obj
 	next *Obj
 
-	p interface{}
-	v *skyobject.Value
+	value *skyobject.Value
+	p     interface{}
 
-	fn    string
-	index int // -1 if single reference (not array).
+	prevFinder       Finder // Finder used on prev obj used to find current.
+	prevFieldName    string // Field name of prev obj used to find current.
+	prevInFieldIndex int    // Index of prev obj's field's prevInFieldIndex. -1 if single reference (not array).
 }
 
-func NewObj(v *skyobject.Value, p interface{}) *Obj {
+func NewObj(v *skyobject.Value, p interface{}, finder Finder, fn string, i int) *Obj {
 	return &Obj{
-		p:     p,
-		v:     v,
-		index: -1,
+		value:            v,
+		p:                p,
+		prevFinder:       finder,
+		prevFieldName:    fn,
+		prevInFieldIndex: i,
 	}
 }
 
-func (o *Obj) Generate(v *skyobject.Value, p interface{}, fn string, i int) *Obj {
-	newO := NewObj(v, p)
+func (o *Obj) Generate(v *skyobject.Value, p interface{}, finder Finder, fn string, i int) *Obj {
+	newO := NewObj(v, p, finder, fn, i)
+	newO.prev = o
 	o.next = newO
-	o.fn = fn
-	o.index = i
 	return newO
 }
 
@@ -90,5 +92,29 @@ func (o *Obj) GetFieldAsReference(fieldName string) (
 	// Obtain field value.
 	f := v.FieldByName(fieldName)
 	ref = f.Interface().(skyobject.Reference)
+	return
+}
+
+func (o *Obj) GetFieldAsDynamic(fieldName string) (
+	dyn skyobject.Dynamic, e error,
+) {
+	v := o.Elem()
+	vt := v.Type()
+
+	// Obtain field.
+	ft, has := vt.FieldByName(fieldName)
+	if has == false {
+		e = ErrFieldNotFound
+		return
+	}
+	// Check type of field.
+	if ft.Type.Kind().String() != "struct" {
+		e = ErrFieldHasWrongType
+		return
+	}
+
+	// Obtain field value.
+	f := v.FieldByName(fieldName)
+	dyn = f.Interface().(skyobject.Dynamic)
 	return
 }
