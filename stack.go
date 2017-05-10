@@ -130,6 +130,7 @@ func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Fi
 			Object: ref,
 			Schema: schema.Reference(),
 		}
+		// Obtain value from root.
 		v, e := r.ValueByDynamic(dynamic)
 		if e != nil {
 			return e
@@ -147,4 +148,57 @@ func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Fi
 		}
 	}
 	return ErrObjNotFound
+}
+
+// AdvanceFromRefField advances from a field of name 'fieldName' and type 'skyobject.Reference'.
+// No Finder is required as field is a single reference.
+// Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
+func (w *Walker) AdvanceFromRefField(fieldName string, p interface{}) error {
+	gMux.Lock()
+	defer gMux.Unlock()
+
+	// Obtain root.
+	r := w.c.LastRoot(w.rpk)
+	if r == nil {
+		return ErrRootNotFound
+	}
+
+	// Obtain top-most object from internal stack.
+	obj, e := w.top()
+	if e != nil {
+		return e
+	}
+
+	// Obtain data from top-most object.
+	// Obtain field's value and schema name.
+	fRef, fSchemaName, e := obj.GetFieldAsReference(fieldName)
+	if e != nil {
+		return e
+	}
+
+	// Get Schema of field reference.
+	schema, e := r.SchemaByName(fSchemaName)
+	if e != nil {
+		return e
+	}
+
+	// Create dynamic reference.
+	dynamic := skyobject.Dynamic{
+		Object: fRef,
+		Schema: schema.Reference(),
+	}
+	// Obtain value from root.
+	v, e := r.ValueByDynamic(dynamic)
+	if e != nil {
+		return e
+	}
+
+	// Deserialize.
+	if e := encoder.DeserializeRaw(v.Data(), p); e != nil {
+		return e
+	}
+	// Add to internal stack.
+	newObj := obj.Generate(v, p, fieldName, -1)
+	w.stack = append(w.stack, newObj)
+	return nil
 }

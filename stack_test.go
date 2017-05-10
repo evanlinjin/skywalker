@@ -80,7 +80,6 @@ func TestWalker_Advance(t *testing.T) {
 		}
 	}
 
-
 	// OBTAIN THE POST >>>
 	{
 		post := &Post{}

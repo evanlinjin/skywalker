@@ -62,11 +62,33 @@ func (o *Obj) GetFieldAsReferences(fieldName string) (
 	// Obtain field value.
 	f := v.FieldByName(fieldName)
 	refs = f.Interface().(skyobject.References)
-
 	return
 }
 
-//func Ha() {
-//	obj := &Obj{}
-//	//obj.value.
-//}
+func (o *Obj) GetFieldAsReference(fieldName string) (
+	ref skyobject.Reference, schemaName string, e error,
+) {
+	v := o.Elem()
+	vt := v.Type()
+
+	// Obtain field.
+	ft, has := vt.FieldByName(fieldName)
+	if has == false {
+		e = ErrFieldNotFound
+		return
+	}
+	// Check type of field.
+	if ft.Type.Kind().String() != "array" {
+		e = ErrFieldHasWrongType
+		return
+	}
+
+	// Obtain schemaName from field tag.
+	fStr := ft.Tag.Get("skyobject")
+	schemaName = strings.TrimPrefix(fStr, "schema=")
+
+	// Obtain field value.
+	f := v.FieldByName(fieldName)
+	ref = f.Interface().(skyobject.Reference)
+	return
+}
