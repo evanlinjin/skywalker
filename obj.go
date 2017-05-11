@@ -185,12 +185,15 @@ func (o *Obj) ReplaceDynamicField(fieldName string, newDyn skyobject.Dynamic) (e
 	return
 }
 
-func (o *Obj) Save(ct *skyobject.Container) (skyobject.Reference, error) {
+func (o *Obj) Save(ct *skyobject.Container) (skyobject.Dynamic, error) {
 	fmt.Println(o.p)
-	ref := ct.Save(o.p)
+	dyn := skyobject.Dynamic{
+		Object: ct.Save(o.p),
+		Schema: o.s,
+	}
 
 	if o.prev == nil {
-		return ref, nil
+		return dyn, nil
 	}
 
 	// Get previous object's field type.
@@ -199,39 +202,39 @@ func (o *Obj) Save(ct *skyobject.Container) (skyobject.Reference, error) {
 
 	sf, has := vt.FieldByName(o.prevFieldName)
 	if has == false {
-		return ref, ErrFieldNotFound
+		return dyn, ErrFieldNotFound
 	}
 
 	switch sf.Type.Kind().String() {
 	case "slice": // skyobject.References
 		tRefs, _, e := o.prev.GetFieldAsReferences(o.prevFieldName)
 		if e != nil {
-			return ref, e
+			return dyn, e
 		}
-		tRefs[o.prevInFieldIndex] = ref
+		tRefs[o.prevInFieldIndex] = dyn.Object
 		e = o.prev.ReplaceReferencesField(o.prevFieldName, tRefs)
 		if e != nil {
-			return ref, e
+			return dyn, e
 		}
 	case "array": // skyobject.Reference
 		tRef, _, e := o.prev.GetFieldAsReference(o.prevFieldName)
 		if e != nil {
-			return ref, e
+			return dyn, e
 		}
-		tRef = ref
+		tRef = dyn.Object
 		e = o.prev.ReplaceReferenceField(o.prevFieldName, tRef)
 		if e != nil {
-			return ref, e
+			return dyn, e
 		}
 	case "struct": // skyobject.Dynamic
 		tDyn, e := o.prev.GetFieldAsDynamic(o.prevFieldName)
 		if e != nil {
-			return ref, e
+			return dyn, e
 		}
-		tDyn.Object = ref
+		tDyn = dyn
 		e = o.prev.ReplaceDynamicField(o.prevFieldName, tDyn)
 		if e != nil {
-			return ref, e
+			return dyn, e
 		}
 	}
 
