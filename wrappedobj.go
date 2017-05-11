@@ -53,7 +53,7 @@ func (o *wrappedObj) getFieldAsReferences(fieldName string) (
 		return
 	}
 	// Check type of field.
-	if ft.Type.Kind().String() != "slice" {
+	if ft.Type.Kind() != reflect.Slice {
 		e = ErrFieldHasWrongType
 		return
 	}
@@ -81,7 +81,7 @@ func (o *wrappedObj) getFieldAsReference(fieldName string) (
 		return
 	}
 	// Check type of field.
-	if ft.Type.Kind().String() != "array" {
+	if ft.Type.Kind() != reflect.Array {
 		e = ErrFieldHasWrongType
 		return
 	}
@@ -109,7 +109,7 @@ func (o *wrappedObj) getFieldAsDynamic(fieldName string) (
 		return
 	}
 	// Check type of field.
-	if ft.Type.Kind().String() != "struct" {
+	if ft.Type.Kind() != reflect.Struct {
 		e = ErrFieldHasWrongType
 		return
 	}
@@ -136,7 +136,7 @@ func (o *wrappedObj) replaceReferencesField(fieldName string, newRefs skyobject.
 		return
 	}
 	// Check type of field.
-	if ft.Type.Kind().String() != "slice" {
+	if ft.Type.Kind() != reflect.Slice {
 		e = ErrFieldHasWrongType
 		return
 	}
@@ -156,7 +156,7 @@ func (o *wrappedObj) replaceReferenceField(fieldName string, newRef skyobject.Re
 		return
 	}
 	// Check type of field.
-	if ft.Type.Kind().String() != "array" {
+	if ft.Type.Kind() != reflect.Array {
 		e = ErrFieldHasWrongType
 		return
 	}
@@ -176,7 +176,7 @@ func (o *wrappedObj) replaceDynamicField(fieldName string, newDyn skyobject.Dyna
 		return
 	}
 	// Check type of field.
-	if ft.Type.Kind().String() != "struct" {
+	if ft.Type.Kind() != reflect.Struct {
 		e = ErrFieldHasWrongType
 		return
 	}
@@ -210,8 +210,8 @@ func (o *wrappedObj) save() (skyobject.Dynamic, error) {
 		return dyn, ErrFieldNotFound
 	}
 
-	switch sf.Type.Kind().String() {
-	case "slice": // skyobject.References
+	switch sf.Type.Kind() {
+	case reflect.Slice: // skyobject.References
 		tRefs, _, e := o.prev.getFieldAsReferences(o.prevFieldName)
 		if e != nil {
 			return dyn, e
@@ -221,7 +221,7 @@ func (o *wrappedObj) save() (skyobject.Dynamic, error) {
 		if e != nil {
 			return dyn, e
 		}
-	case "array": // skyobject.Reference
+	case reflect.Array: // skyobject.Reference
 		tRef, _, e := o.prev.getFieldAsReference(o.prevFieldName)
 		if e != nil {
 			return dyn, e
@@ -231,7 +231,7 @@ func (o *wrappedObj) save() (skyobject.Dynamic, error) {
 		if e != nil {
 			return dyn, e
 		}
-	case "struct": // skyobject.Dynamic
+	case reflect.Struct: // skyobject.Dynamic
 		tDyn, e := o.prev.getFieldAsDynamic(o.prevFieldName)
 		if e != nil {
 			return dyn, e
