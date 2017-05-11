@@ -260,6 +260,44 @@ func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 	})
 }
 
+func TestWalker_AppendToRefsField(t *testing.T) {
+	pk, sk := genKeyPair()
+	c := newContainer()
+	fillContainer1(c, pk, sk)
+	w, _ := NewWalker(c, pk, sk)
+
+	board := &Board{}
+	e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
+		if v.Schema().Name() != "Board" {
+			return false
+		}
+		fv, _ := v.FieldByName("Name")
+		s, _ := fv.String()
+		return s == "Talk"
+	})
+	if e != nil {
+		t.Error("advance from root failed:", e)
+	}
+	t.Log(w.String())
+
+	e = w.AppendToRefsField("Threads", Thread{Name: "New Thread"})
+	if e != nil {
+		t.Error("append thread to board failed:", e)
+	}
+	t.Log(w.String())
+
+	thread := &Thread{}
+	e = w.AdvanceFromRefsField("Threads", thread, func(v *skyobject.Value) (chosen bool) {
+		fv, _ := v.FieldByName("Name")
+		s, _ := fv.String()
+		return s == "New Thread"
+	})
+	if e != nil {
+		t.Error("advance from board to thread failed:", e)
+	}
+	t.Log(w.String())
+}
+
 func TestWalker_ReplaceInRefField(t *testing.T) {
 	t.Run("depth of 1", func(t *testing.T) {
 		pk, sk := genKeyPair()

@@ -259,7 +259,9 @@ func (w *Walker) Retreat() {
 	}
 }
 
-// AddToRefsField
+// AppendToRefsField appends a reference to references field 'fieldName' of top-most object. The new reference will be
+// generated automatically by saving the object which 'p' points to. This recursively replaces all the associated
+// "references" of the object tree and hence, changes the root.
 func (w *Walker) AppendToRefsField(fieldName string, p interface{}) error {
 	gMux.Lock()
 	defer gMux.Unlock()
@@ -289,7 +291,6 @@ func (w *Walker) AppendToRefsField(fieldName string, p interface{}) error {
 }
 
 // TODO: Implement.
-// AppendToRefsField
 // ReplaceInRefsField
 // DeleteInRefsField
 //
