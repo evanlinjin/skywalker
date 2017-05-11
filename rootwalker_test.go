@@ -64,7 +64,7 @@ func newClient() *node.Client {
 	return c
 }
 
-func fillContainer1(c *node.Container, pk cipher.PubKey, sk cipher.SecKey) {
+func fillContainer1(c *node.Container, pk cipher.PubKey, sk cipher.SecKey) *node.Root {
 	r := c.NewRoot(pk, sk)
 
 	dynPerson := r.Dynamic(Person{"Dynamic Beast", 100})
@@ -98,15 +98,15 @@ func fillContainer1(c *node.Container, pk cipher.PubKey, sk cipher.SecKey) {
 		Board{"Test", persons[3], dynPost, threads[2:]},
 		Board{"Talk", persons[1], dynPerson, threads[:2]},
 	)
+
+	return r
 }
 
 func TestNewWalker(t *testing.T) {
 	pk, sk := genKeyPair()
 	client := newClient()
 	defer client.Close()
-	c := client.Container()
-	fillContainer1(c, pk, sk)
-	_, e := NewRootWalker(c, pk, sk)
+	_, e := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 	if e != nil {
 		t.Error("failed to create walker;", e)
 	}
@@ -117,9 +117,7 @@ func TestWalker_AdvanceFromRoot(t *testing.T) {
 	pk, sk := genKeyPair()
 	client := newClient()
 	defer client.Close()
-	c := client.Container()
-	fillContainer1(c, pk, sk)
-	w, _ := NewRootWalker(c, pk, sk)
+	w, _ := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 
 	board := &Board{}
 	e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
@@ -140,9 +138,7 @@ func TestWalker_AdvanceFromRefsField(t *testing.T) {
 	pk, sk := genKeyPair()
 	client := newClient()
 	defer client.Close()
-	c := client.Container()
-	fillContainer1(c, pk, sk)
-	w, _ := NewRootWalker(c, pk, sk)
+	w, _ := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 
 	board := &Board{}
 	thread := &Thread{}
@@ -186,9 +182,7 @@ func TestWalker_AdvanceFromRefField(t *testing.T) {
 	pk, sk := genKeyPair()
 	client := newClient()
 	defer client.Close()
-	c := client.Container()
-	fillContainer1(c, pk, sk)
-	w, _ := NewRootWalker(c, pk, sk)
+	w, _ := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 
 	board := &Board{}
 	thread := &Thread{}
@@ -229,9 +223,7 @@ func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 		pk, sk := genKeyPair()
 		client := newClient()
 		defer client.Close()
-		c := client.Container()
-		fillContainer1(c, pk, sk)
-		w, _ := NewRootWalker(c, pk, sk)
+		w, _ := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 
 		board := &Board{}
 		post := &Post{}
@@ -260,9 +252,7 @@ func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 		pk, sk := genKeyPair()
 		client := newClient()
 		defer client.Close()
-		c := client.Container()
-		fillContainer1(c, pk, sk)
-		w, _ := NewRootWalker(c, pk, sk)
+		w, _ := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 
 		board := &Board{}
 		person := &Person{}
@@ -293,9 +283,7 @@ func TestWalker_AppendToRefsField(t *testing.T) {
 	pk, sk := genKeyPair()
 	client := newClient()
 	defer client.Close()
-	c := client.Container()
-	fillContainer1(c, pk, sk)
-	w, _ := NewRootWalker(c, pk, sk)
+	w, _ := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 
 	board := &Board{}
 	e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
@@ -334,9 +322,7 @@ func TestWalker_ReplaceInRefField(t *testing.T) {
 		pk, sk := genKeyPair()
 		client := newClient()
 		defer client.Close()
-		c := client.Container()
-		fillContainer1(c, pk, sk)
-		w, _ := NewRootWalker(c, pk, sk)
+		w, _ := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 
 		board := &Board{}
 		e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
@@ -362,9 +348,7 @@ func TestWalker_ReplaceInRefField(t *testing.T) {
 		pk, sk := genKeyPair()
 		client := newClient()
 		defer client.Close()
-		c := client.Container()
-		fillContainer1(c, pk, sk)
-		w, _ := NewRootWalker(c, pk, sk)
+		w, _ := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 
 		board := &Board{}
 		e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
@@ -392,7 +376,7 @@ func TestWalker_ReplaceInRefField(t *testing.T) {
 		t.Log(w.String())
 		{
 			p := &Person{}
-			data, _ := c.Get(thread.Creator)
+			data, _ := w.r.Get(thread.Creator)
 			encoder.DeserializeRaw(data, p)
 			t.Log(p)
 		}
@@ -405,7 +389,7 @@ func TestWalker_ReplaceInRefField(t *testing.T) {
 		t.Log(w.String())
 		{
 			p := &Person{}
-			data, _ := c.Get(thread.Creator)
+			data, _ := w.r.Get(thread.Creator)
 			encoder.DeserializeRaw(data, p)
 			t.Log(p)
 		}
@@ -417,9 +401,7 @@ func TestWalker_ReplaceInDynamicField(t *testing.T) {
 		pk, sk := genKeyPair()
 		client := newClient()
 		defer client.Close()
-		c := client.Container()
-		fillContainer1(c, pk, sk)
-		w, _ := NewRootWalker(c, pk, sk)
+		w, _ := NewRootWalker(fillContainer1(client.Container(), pk, sk), pk, sk)
 
 		board := &Board{}
 		e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
@@ -437,7 +419,7 @@ func TestWalker_ReplaceInDynamicField(t *testing.T) {
 		t.Log(w.String())
 		{
 			p := &Person{}
-			data, _ := c.Get(board.Featured.Object)
+			data, _ := w.r.Get(board.Featured.Object)
 			encoder.DeserializeRaw(data, p)
 			t.Log(p)
 		}
@@ -450,7 +432,7 @@ func TestWalker_ReplaceInDynamicField(t *testing.T) {
 		t.Log(w.String())
 		{
 			p := &Post{}
-			data, _ := c.Get(board.Featured.Object)
+			data, _ := w.r.Get(board.Featured.Object)
 			encoder.DeserializeRaw(data, p)
 			t.Log(p)
 		}

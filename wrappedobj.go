@@ -188,13 +188,13 @@ func (o *wrappedObj) replaceDynamicField(fieldName string, newDyn skyobject.Dyna
 func (o *wrappedObj) save() (skyobject.Dynamic, error) {
 	// Create dynamic reference of current object.
 	dyn := skyobject.Dynamic{
-		Object: o.w.c.Save(o.p),
+		Object: o.w.r.Save(o.p),
 		Schema: o.s,
 	}
 
 	// If this object is the direct child of root, save to root and return.
 	if o.prev == nil {
-		r := o.w.c.LastRoot(o.w.rpk)
+		r := o.w.r
 		rDyns := r.Refs()
 		rDyns[o.prevInFieldIndex] = dyn
 		r.Replace(rDyns)

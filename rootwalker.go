@@ -16,20 +16,20 @@ var gMux sync.Mutex
 type RootWalker struct {
 	rpk   cipher.PubKey
 	rsk   cipher.SecKey
-	c     *node.Container
+	r     *node.Root
 	stack []*wrappedObj
 }
 
 // NewRootWalker creates a new walker with given container and root's public key.
-func NewRootWalker(c *node.Container, rpk cipher.PubKey, rsk cipher.SecKey) (w *RootWalker, e error) {
-	if c == nil {
+func NewRootWalker(r *node.Root, rpk cipher.PubKey, rsk cipher.SecKey) (w *RootWalker, e error) {
+	if r == nil {
 		e = errors.New("nil container error")
 		return
 	}
 	w = &RootWalker{
 		rpk: rpk,
 		rsk: rsk,
-		c:   c,
+		r:   r,
 	}
 	return
 }
@@ -63,10 +63,9 @@ func (w *RootWalker) AdvanceFromRoot(p interface{}, finder func(v *skyobject.Val
 	// Clear the internal stack.
 	w.Clear()
 
-	// Search from root when nothing is on object stack yet.
-	// Obtain root and it's direct children.
-	r := w.c.LastRoot(w.rpk)
-	if r == nil {
+	// Check root.
+	r := w.r
+	if w.r == nil {
 		return ErrRootNotFound
 	}
 
@@ -98,9 +97,9 @@ func (w *RootWalker) AdvanceFromRefsField(fieldName string, p interface{}, finde
 	gMux.Lock()
 	defer gMux.Unlock()
 
-	// Obtain root.
-	r := w.c.LastRoot(w.rpk)
-	if r == nil {
+	// Check root.
+	r := w.r
+	if w.r == nil {
 		return ErrRootNotFound
 	}
 
@@ -157,9 +156,9 @@ func (w *RootWalker) AdvanceFromRefField(fieldName string, p interface{}) error 
 	gMux.Lock()
 	defer gMux.Unlock()
 
-	// Obtain root.
-	r := w.c.LastRoot(w.rpk)
-	if r == nil {
+	// Check root.
+	r := w.r
+	if w.r == nil {
 		return ErrRootNotFound
 	}
 
@@ -210,9 +209,9 @@ func (w *RootWalker) AdvanceFromDynamicField(fieldName string, p interface{}) er
 	gMux.Lock()
 	defer gMux.Unlock()
 
-	// Obtain root.
-	r := w.c.LastRoot(w.rpk)
-	if r == nil {
+	// Check root.
+	r := w.r
+	if w.r == nil {
 		return ErrRootNotFound
 	}
 
@@ -272,7 +271,7 @@ func (w *RootWalker) AppendToRefsField(fieldName string, p interface{}) error {
 	}
 
 	// Save new obj.
-	nRef := w.c.Save(p)
+	nRef := w.r.Save(p)
 
 	// Edit top-most object.
 	tRefs, _, e := tObj.getFieldAsReferences(fieldName)
@@ -307,7 +306,7 @@ func (w *RootWalker) ReplaceInRefField(fieldName string, p interface{}) error {
 	}
 
 	// Save new obj.
-	nRef := w.c.Save(p)
+	nRef := w.r.Save(p)
 	if e := tObj.replaceReferenceField(fieldName, nRef); e != nil {
 		return e
 	}
@@ -330,7 +329,7 @@ func (w *RootWalker) ReplaceInDynamicField(fieldName string, p interface{}) erro
 	}
 
 	// Save new object.
-	nDyn := w.c.Dynamic(p)
+	nDyn := w.r.Dynamic(p)
 	if e := tObj.replaceDynamicField(fieldName, nDyn); e != nil {
 		return e
 	}
@@ -340,6 +339,7 @@ func (w *RootWalker) ReplaceInDynamicField(fieldName string, p interface{}) erro
 	return e
 }
 
+// String creates a readable string that shows information of the internal stack.
 func (w *RootWalker) String() (out string) {
 	tabs := func(n int) {
 		for i := 0; i < n; i++ {
@@ -354,7 +354,7 @@ func (w *RootWalker) String() (out string) {
 	out += fmt.Sprintf(".Refs[%d] ->\n", w.stack[0].prevInFieldIndex)
 	for i, obj := range w.stack {
 		schName := ""
-		s, _ := w.c.CoreRegistry().SchemaByReference(obj.s)
+		s, _ := w.r.SchemaByReference(obj.s)
 		if s != nil {
 			schName = s.Name()
 		}
