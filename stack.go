@@ -84,7 +84,7 @@ func (w *Walker) AdvanceFromRoot(p interface{}, finder Finder) error {
 			if e := encoder.DeserializeRaw(v.Data(), p); e != nil {
 				return e
 			}
-			obj := NewObj(v.Schema().Reference(), p, finder, "", i)
+			obj := w.NewObj(v.Schema().Reference(), p, finder, "", i)
 			w.stack = append(w.stack, obj)
 			return nil
 		}
@@ -259,12 +259,43 @@ func (w *Walker) Retreat() {
 	}
 }
 
+// AddToRefsField
+func (w *Walker) AppendToRefsField(fieldName string, p interface{}) error {
+	gMux.Lock()
+	defer gMux.Unlock()
+
+	// Obtain top-most object.
+	tObj, e := w.peek()
+	if e != nil {
+		return e
+	}
+
+	// Save new obj.
+	nRef := w.c.Save(p)
+
+	// Edit top-most object.
+	tRefs, _, e := tObj.GetFieldAsReferences(fieldName)
+	if e != nil {
+		return e
+	}
+	tRefs = append(tRefs, nRef)
+	if e := tObj.ReplaceReferencesField(fieldName, tRefs); e != nil {
+		return e
+	}
+
+	// Recursively save.
+	_, e = tObj.Save()
+	return e
+}
+
 // TODO: Implement.
 // AppendToRefsField
 // ReplaceInRefsField
 // DeleteInRefsField
 //
-// ReplaceInRefField
+// ReplaceInRefField replaces the reference field of the top-most object with a new reference; one that is automatically
+// generated when saving the object 'p' points to, in the container. This recursively replaces all the associated
+// "references" of the object tree and hence, changes the root.
 func (w *Walker) ReplaceInRefField(fieldName string, p interface{}) error {
 	gMux.Lock()
 	defer gMux.Unlock()
@@ -282,24 +313,32 @@ func (w *Walker) ReplaceInRefField(fieldName string, p interface{}) error {
 	}
 
 	// Recursively save.
-	lRef, e := tObj.Save(w.c)
+	_, e = tObj.Save()
+	return e
+}
+
+// ReplaceInDynamicField functions the same as 'ReplaceInRefField'. However, it replaces a dynamic reference field other
+// than a static reference field.
+func (w *Walker) ReplaceInDynamicField(fieldName string, p interface{}) error {
+	gMux.Lock()
+	defer gMux.Unlock()
+
+	// Obtain top-most object.
+	tObj, e := w.peek()
 	if e != nil {
 		return e
 	}
 
-	// Replace root's direct child.
-	r := w.c.LastRoot(w.rpk)
+	// Save new object.
+	nDyn := w.c.Dynamic(p)
+	if e := tObj.ReplaceDynamicField(fieldName, nDyn); e != nil {
+		return e
+	}
 
-	rDyns := r.Refs()
-	rDyns[w.stack[0].prevInFieldIndex].Object = lRef
-	fmt.Println("RUNNING: r.Replace(rDyns)")
-	r.Replace(rDyns)
-	fmt.Println("DONE: r.Replace(rDyns)")
-
-	return nil
+	// Recursively save.
+	_, e = tObj.Save()
+	return e
 }
-
-// ReplaceInDynamicField
 
 func (w *Walker) String() (out string) {
 	tabs := func(n int) {

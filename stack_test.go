@@ -3,6 +3,7 @@ package skywalker
 import (
 	"github.com/skycoin/cxo/skyobject"
 	"github.com/skycoin/skycoin/src/cipher"
+	"github.com/skycoin/skycoin/src/cipher/encoder"
 	"testing"
 )
 
@@ -39,10 +40,10 @@ func genKeyPair() (cipher.PubKey, cipher.SecKey) {
 
 func newContainer() *skyobject.Container {
 	r := skyobject.NewRegistry()
-	r.Regsiter("Person", Person{})
-	r.Regsiter("Post", Post{})
-	r.Regsiter("Thread", Thread{})
-	r.Regsiter("Board", Board{})
+	r.Register("Person", Person{})
+	r.Register("Post", Post{})
+	r.Register("Thread", Thread{})
+	r.Register("Board", Board{})
 	r.Done()
 	return skyobject.NewContainer(r)
 }
@@ -260,28 +261,123 @@ func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 }
 
 func TestWalker_ReplaceInRefField(t *testing.T) {
-	pk, sk := genKeyPair()
-	c := newContainer()
-	fillContainer1(c, pk, sk)
-	w, _ := NewWalker(c, pk, sk)
+	t.Run("depth of 1", func(t *testing.T) {
+		pk, sk := genKeyPair()
+		c := newContainer()
+		fillContainer1(c, pk, sk)
+		w, _ := NewWalker(c, pk, sk)
 
-	board := &Board{}
-	e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
-		if v.Schema().Name() != "Board" {
-			return false
+		board := &Board{}
+		e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
+			if v.Schema().Name() != "Board" {
+				return false
+			}
+			fv, _ := v.FieldByName("Name")
+			s, _ := fv.String()
+			return s == "Talk"
+		})
+		if e != nil {
+			t.Error("advance from root failed:", e)
 		}
-		fv, _ := v.FieldByName("Name")
-		s, _ := fv.String()
-		return s == "Talk"
-	})
-	if e != nil {
-		t.Error("advance from root failed:", e)
-	}
-	t.Log(w.String())
+		t.Log(w.String())
 
-	e = w.ReplaceInRefField("Creator", Person{"Donald Trump", 70})
-	if e != nil {
-		t.Error("failed to replace:", e)
-	}
-	t.Log(w.String())
+		e = w.ReplaceInRefField("Creator", Person{"Donald Trump", 70})
+		if e != nil {
+			t.Error("failed to replace:", e)
+		}
+		t.Log(w.String())
+	})
+	t.Run("depth of 2", func(t *testing.T) {
+		pk, sk := genKeyPair()
+		c := newContainer()
+		fillContainer1(c, pk, sk)
+		w, _ := NewWalker(c, pk, sk)
+
+		board := &Board{}
+		e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
+			if v.Schema().Name() != "Board" {
+				return false
+			}
+			fv, _ := v.FieldByName("Name")
+			s, _ := fv.String()
+			return s == "Talk"
+		})
+		if e != nil {
+			t.Error("advance from root failed:", e)
+		}
+
+		thread := &Thread{}
+		e = w.AdvanceFromRefsField("Threads", thread, func(v *skyobject.Value) (chosen bool) {
+			fv, _ := v.FieldByName("Name")
+			s, _ := fv.String()
+			return s == "Greetings"
+		})
+		if e != nil {
+			t.Error("advance from board to thread failed:", e)
+		}
+
+		t.Log(w.String())
+		{
+			p := &Person{}
+			data, _ := c.Get(thread.Creator)
+			encoder.DeserializeRaw(data, p)
+			t.Log(p)
+		}
+
+		e = w.ReplaceInRefField("Creator", Person{Name: "Bruce Lee", Age: 77})
+		if e != nil {
+			t.Error("failed to replace", e)
+		}
+
+		t.Log(w.String())
+		{
+			p := &Person{}
+			data, _ := c.Get(thread.Creator)
+			encoder.DeserializeRaw(data, p)
+			t.Log(p)
+		}
+	})
+}
+
+func TestWalker_ReplaceInDynamicField(t *testing.T) {
+	t.Run("depth of 1", func(t *testing.T) {
+		pk, sk := genKeyPair()
+		c := newContainer()
+		fillContainer1(c, pk, sk)
+		w, _ := NewWalker(c, pk, sk)
+
+		board := &Board{}
+		e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
+			if v.Schema().Name() != "Board" {
+				return false
+			}
+			fv, _ := v.FieldByName("Name")
+			s, _ := fv.String()
+			return s == "Talk"
+		})
+		if e != nil {
+			t.Error("advance from root failed:", e)
+		}
+
+		t.Log(w.String())
+		{
+			p := &Person{}
+			data, _ := c.Get(board.Featured.Object)
+			encoder.DeserializeRaw(data, p)
+			t.Log(p)
+		}
+
+		e = w.ReplaceInDynamicField("Featured", Post{Title: "Good Game", Body: "Yeah, this is fun."})
+		if e != nil {
+			t.Error("replace failed:", e)
+		}
+
+		t.Log(w.String())
+		{
+			p := &Post{}
+			data, _ := c.Get(board.Featured.Object)
+			encoder.DeserializeRaw(data, p)
+			t.Log(p)
+		}
+	})
 }
