@@ -6,11 +6,8 @@ import (
 	"github.com/skycoin/cxo/skyobject"
 	"github.com/skycoin/skycoin/src/cipher"
 	"github.com/skycoin/skycoin/src/cipher/encoder"
-	"sync"
 	"github.com/skycoin/cxo/node"
 )
-
-var gMux sync.Mutex
 
 // RootWalker represents an object the walks a root's tree.
 type RootWalker struct {
@@ -57,9 +54,6 @@ func (w *RootWalker) peek() (*wrappedObj, error) {
 // This function auto-clears the internal stack.
 // Input 'p' should be provided with a pointer to the object in which the chosen root's child should deserialize to.
 func (w *RootWalker) AdvanceFromRoot(p interface{}, finder func(v *skyobject.Value) bool) error {
-	gMux.Lock()
-	defer gMux.Unlock()
-
 	// Clear the internal stack.
 	w.Clear()
 
@@ -94,9 +88,6 @@ func (w *RootWalker) AdvanceFromRoot(p interface{}, finder func(v *skyobject.Val
 // It uses a Finder implementation to find the child to advance to.
 // Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
 func (w *RootWalker) AdvanceFromRefsField(fieldName string, p interface{}, finder func(v *skyobject.Value) bool) error {
-	gMux.Lock()
-	defer gMux.Unlock()
-
 	// Check root.
 	r := w.r
 	if w.r == nil {
@@ -153,9 +144,6 @@ func (w *RootWalker) AdvanceFromRefsField(fieldName string, p interface{}, finde
 // No Finder is required as field is a single reference.
 // Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
 func (w *RootWalker) AdvanceFromRefField(fieldName string, p interface{}) error {
-	gMux.Lock()
-	defer gMux.Unlock()
-
 	// Check root.
 	r := w.r
 	if w.r == nil {
@@ -206,9 +194,6 @@ func (w *RootWalker) AdvanceFromRefField(fieldName string, p interface{}) error 
 // No Finder is required as field is a single reference.
 // Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
 func (w *RootWalker) AdvanceFromDynamicField(fieldName string, p interface{}) error {
-	gMux.Lock()
-	defer gMux.Unlock()
-
 	// Check root.
 	r := w.r
 	if w.r == nil {
@@ -261,9 +246,6 @@ func (w *RootWalker) Retreat() {
 // generated automatically by saving the object which 'p' points to. This recursively replaces all the associated
 // "references" of the object tree and hence, changes the root.
 func (w *RootWalker) AppendToRefsField(fieldName string, p interface{}) error {
-	gMux.Lock()
-	defer gMux.Unlock()
-
 	// Obtain top-most object.
 	tObj, e := w.peek()
 	if e != nil {
@@ -296,9 +278,6 @@ func (w *RootWalker) AppendToRefsField(fieldName string, p interface{}) error {
 // generated when saving the object 'p' points to, in the container. This recursively replaces all the associated
 // "references" of the object tree and hence, changes the root.
 func (w *RootWalker) ReplaceInRefField(fieldName string, p interface{}) error {
-	gMux.Lock()
-	defer gMux.Unlock()
-
 	// Obtain top-most object.
 	tObj, e := w.peek()
 	if e != nil {
@@ -319,9 +298,6 @@ func (w *RootWalker) ReplaceInRefField(fieldName string, p interface{}) error {
 // ReplaceInDynamicField functions the same as 'ReplaceInRefField'. However, it replaces a dynamic reference field other
 // than a static reference field.
 func (w *RootWalker) ReplaceInDynamicField(fieldName string, p interface{}) error {
-	gMux.Lock()
-	defer gMux.Unlock()
-
 	// Obtain top-most object.
 	tObj, e := w.peek()
 	if e != nil {
