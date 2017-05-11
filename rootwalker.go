@@ -7,6 +7,7 @@ import (
 	"github.com/skycoin/skycoin/src/cipher"
 	"github.com/skycoin/skycoin/src/cipher/encoder"
 	"sync"
+	"github.com/skycoin/cxo/node"
 )
 
 var gMux sync.Mutex
@@ -15,12 +16,12 @@ var gMux sync.Mutex
 type RootWalker struct {
 	rpk   cipher.PubKey
 	rsk   cipher.SecKey
-	c     *skyobject.Container
+	c     *node.Container
 	stack []*wrappedObj
 }
 
 // NewRootWalker creates a new walker with given container and root's public key.
-func NewRootWalker(c *skyobject.Container, rpk cipher.PubKey, rsk cipher.SecKey) (w *RootWalker, e error) {
+func NewRootWalker(c *node.Container, rpk cipher.PubKey, rsk cipher.SecKey) (w *RootWalker, e error) {
 	if c == nil {
 		e = errors.New("nil container error")
 		return

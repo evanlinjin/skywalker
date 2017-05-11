@@ -5,6 +5,9 @@ import (
 	"github.com/skycoin/skycoin/src/cipher"
 	"github.com/skycoin/skycoin/src/cipher/encoder"
 	"testing"
+	"github.com/skycoin/cxo/node"
+	"log"
+	"time"
 )
 
 type Board struct {
@@ -38,17 +41,30 @@ func genKeyPair() (cipher.PubKey, cipher.SecKey) {
 	return cipher.GenerateDeterministicKeyPair([]byte("a"))
 }
 
-func newContainer() *skyobject.Container {
+func newClient() *node.Client {
 	r := skyobject.NewRegistry()
 	r.Register("Person", Person{})
 	r.Register("Post", Post{})
 	r.Register("Thread", Thread{})
 	r.Register("Board", Board{})
 	r.Done()
-	return skyobject.NewContainer(r)
+	c, e := node.NewClient(node.NewClientConfig(), skyobject.NewContainer(r))
+	if e != nil {
+		log.Panic(e)
+	}
+	e = c.Start("[::]:8998")
+	if e != nil {
+		log.Panic(e)
+	}
+	time.Sleep(5 * time.Second)
+	pk, _ := genKeyPair()
+	if c.Subscribe(pk) == false {
+		log.Panic("unable to subscribe")
+	}
+	return c
 }
 
-func fillContainer1(c *skyobject.Container, pk cipher.PubKey, sk cipher.SecKey) {
+func fillContainer1(c *node.Container, pk cipher.PubKey, sk cipher.SecKey) {
 	r := c.NewRoot(pk, sk)
 
 	dynPerson := r.Dynamic(Person{"Dynamic Beast", 100})
@@ -86,17 +102,22 @@ func fillContainer1(c *skyobject.Container, pk cipher.PubKey, sk cipher.SecKey) 
 
 func TestNewWalker(t *testing.T) {
 	pk, sk := genKeyPair()
-	c := newContainer()
+	client := newClient()
+	defer client.Close()
+	c := client.Container()
 	fillContainer1(c, pk, sk)
 	_, e := NewRootWalker(c, pk, sk)
 	if e != nil {
 		t.Error("failed to create walker;", e)
 	}
+	client.Close()
 }
 
 func TestWalker_AdvanceFromRoot(t *testing.T) {
 	pk, sk := genKeyPair()
-	c := newContainer()
+	client := newClient()
+	defer client.Close()
+	c := client.Container()
 	fillContainer1(c, pk, sk)
 	w, _ := NewRootWalker(c, pk, sk)
 
@@ -117,7 +138,9 @@ func TestWalker_AdvanceFromRoot(t *testing.T) {
 
 func TestWalker_AdvanceFromRefsField(t *testing.T) {
 	pk, sk := genKeyPair()
-	c := newContainer()
+	client := newClient()
+	defer client.Close()
+	c := client.Container()
 	fillContainer1(c, pk, sk)
 	w, _ := NewRootWalker(c, pk, sk)
 
@@ -161,7 +184,9 @@ func TestWalker_AdvanceFromRefsField(t *testing.T) {
 
 func TestWalker_AdvanceFromRefField(t *testing.T) {
 	pk, sk := genKeyPair()
-	c := newContainer()
+	client := newClient()
+	defer client.Close()
+	c := client.Container()
 	fillContainer1(c, pk, sk)
 	w, _ := NewRootWalker(c, pk, sk)
 
@@ -202,7 +227,9 @@ func TestWalker_AdvanceFromRefField(t *testing.T) {
 func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 	t.Run("dynamic post", func(t *testing.T) {
 		pk, sk := genKeyPair()
-		c := newContainer()
+		client := newClient()
+		defer client.Close()
+		c := client.Container()
 		fillContainer1(c, pk, sk)
 		w, _ := NewRootWalker(c, pk, sk)
 
@@ -231,7 +258,9 @@ func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 	})
 	t.Run("dynamic person", func(t *testing.T) {
 		pk, sk := genKeyPair()
-		c := newContainer()
+		client := newClient()
+		defer client.Close()
+		c := client.Container()
 		fillContainer1(c, pk, sk)
 		w, _ := NewRootWalker(c, pk, sk)
 
@@ -262,7 +291,9 @@ func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 
 func TestWalker_AppendToRefsField(t *testing.T) {
 	pk, sk := genKeyPair()
-	c := newContainer()
+	client := newClient()
+	defer client.Close()
+	c := client.Container()
 	fillContainer1(c, pk, sk)
 	w, _ := NewRootWalker(c, pk, sk)
 
@@ -301,7 +332,9 @@ func TestWalker_AppendToRefsField(t *testing.T) {
 func TestWalker_ReplaceInRefField(t *testing.T) {
 	t.Run("depth of 1", func(t *testing.T) {
 		pk, sk := genKeyPair()
-		c := newContainer()
+		client := newClient()
+		defer client.Close()
+		c := client.Container()
 		fillContainer1(c, pk, sk)
 		w, _ := NewRootWalker(c, pk, sk)
 
@@ -327,7 +360,9 @@ func TestWalker_ReplaceInRefField(t *testing.T) {
 	})
 	t.Run("depth of 2", func(t *testing.T) {
 		pk, sk := genKeyPair()
-		c := newContainer()
+		client := newClient()
+		defer client.Close()
+		c := client.Container()
 		fillContainer1(c, pk, sk)
 		w, _ := NewRootWalker(c, pk, sk)
 
@@ -380,7 +415,9 @@ func TestWalker_ReplaceInRefField(t *testing.T) {
 func TestWalker_ReplaceInDynamicField(t *testing.T) {
 	t.Run("depth of 1", func(t *testing.T) {
 		pk, sk := genKeyPair()
-		c := newContainer()
+		client := newClient()
+		defer client.Close()
+		c := client.Container()
 		fillContainer1(c, pk, sk)
 		w, _ := NewRootWalker(c, pk, sk)
 
