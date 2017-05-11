@@ -15,7 +15,7 @@ var (
 	// ErrFieldNotProvided occurs when the field name of a struct is not provided.
 	ErrFieldNotProvided = errors.New("field not provided")
 
-	// ErrEmptyInternalStack occurs when an action performed on Walker requires a non-empty internal stack,
+	// ErrEmptyInternalStack occurs when an action performed on RootWalker requires a non-empty internal stack,
 	// but internal stack is empty.
 	ErrEmptyInternalStack = errors.New("internal stack of walker is empty")
 

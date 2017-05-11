@@ -11,23 +11,21 @@ import (
 
 var gMux sync.Mutex
 
-type Finder func(v *skyobject.Value) (chosen bool)
-
-// Walker represents an object the walks a root's tree.
-type Walker struct {
+// RootWalker represents an object the walks a root's tree.
+type RootWalker struct {
 	rpk   cipher.PubKey
 	rsk   cipher.SecKey
 	c     *skyobject.Container
-	stack []*Obj
+	stack []*wrappedObj
 }
 
-// NewWalker creates a new walker with given container and root's public key.
-func NewWalker(c *skyobject.Container, rpk cipher.PubKey, rsk cipher.SecKey) (w *Walker, e error) {
+// NewRootWalker creates a new walker with given container and root's public key.
+func NewRootWalker(c *skyobject.Container, rpk cipher.PubKey, rsk cipher.SecKey) (w *RootWalker, e error) {
 	if c == nil {
 		e = errors.New("nil container error")
 		return
 	}
-	w = &Walker{
+	w = &RootWalker{
 		rpk: rpk,
 		rsk: rsk,
 		c:   c,
@@ -36,17 +34,17 @@ func NewWalker(c *skyobject.Container, rpk cipher.PubKey, rsk cipher.SecKey) (w 
 }
 
 // Size returns the size of the internal stack of walker.
-func (w *Walker) Size() int {
+func (w *RootWalker) Size() int {
 	return len(w.stack)
 }
 
 // Clear clears the internal stack.
-func (w *Walker) Clear() {
-	w.stack = []*Obj{}
+func (w *RootWalker) Clear() {
+	w.stack = []*wrappedObj{}
 }
 
 // Helper function. Obtains top-most object from internal stack.
-func (w *Walker) peek() (*Obj, error) {
+func (w *RootWalker) peek() (*wrappedObj, error) {
 	if w.Size() == 0 {
 		return nil, ErrEmptyInternalStack
 	}
@@ -57,7 +55,7 @@ func (w *Walker) peek() (*Obj, error) {
 // It uses a Finder implementation to find the child to advance to.
 // This function auto-clears the internal stack.
 // Input 'p' should be provided with a pointer to the object in which the chosen root's child should deserialize to.
-func (w *Walker) AdvanceFromRoot(p interface{}, finder Finder) error {
+func (w *RootWalker) AdvanceFromRoot(p interface{}, finder func(v *skyobject.Value) bool) error {
 	gMux.Lock()
 	defer gMux.Unlock()
 
@@ -84,7 +82,7 @@ func (w *Walker) AdvanceFromRoot(p interface{}, finder Finder) error {
 			if e := encoder.DeserializeRaw(v.Data(), p); e != nil {
 				return e
 			}
-			obj := w.NewObj(v.Schema().Reference(), p, finder, "", i)
+			obj := w.newObj(v.Schema().Reference(), p, "", i)
 			w.stack = append(w.stack, obj)
 			return nil
 		}
@@ -95,7 +93,7 @@ func (w *Walker) AdvanceFromRoot(p interface{}, finder Finder) error {
 // AdvanceFromRefsField advances from a field of name 'prevFieldName' and of type 'skyobject.References'.
 // It uses a Finder implementation to find the child to advance to.
 // Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
-func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Finder) error {
+func (w *RootWalker) AdvanceFromRefsField(fieldName string, p interface{}, finder func(v *skyobject.Value) bool) error {
 	gMux.Lock()
 	defer gMux.Unlock()
 
@@ -113,7 +111,7 @@ func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Fi
 
 	// Obtain data from top-most object.
 	// Obtain field's value and schema name.
-	fRefs, fSchemaName, e := obj.GetFieldAsReferences(fieldName)
+	fRefs, fSchemaName, e := obj.getFieldAsReferences(fieldName)
 	if e != nil {
 		return e
 	}
@@ -143,7 +141,7 @@ func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Fi
 				return e
 			}
 			// Add to stack.
-			newObj := obj.Generate(v.Schema().Reference(), p, finder, fieldName, i)
+			newObj := obj.generate(v.Schema().Reference(), p, fieldName, i)
 			w.stack = append(w.stack, newObj)
 			return nil
 		}
@@ -154,7 +152,7 @@ func (w *Walker) AdvanceFromRefsField(fieldName string, p interface{}, finder Fi
 // AdvanceFromRefField advances from a field of name 'prevFieldName' and type 'skyobject.Reference'.
 // No Finder is required as field is a single reference.
 // Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
-func (w *Walker) AdvanceFromRefField(fieldName string, p interface{}) error {
+func (w *RootWalker) AdvanceFromRefField(fieldName string, p interface{}) error {
 	gMux.Lock()
 	defer gMux.Unlock()
 
@@ -172,7 +170,7 @@ func (w *Walker) AdvanceFromRefField(fieldName string, p interface{}) error {
 
 	// Obtain data from top-most object.
 	// Obtain field's value and schema name.
-	fRef, fSchemaName, e := obj.GetFieldAsReference(fieldName)
+	fRef, fSchemaName, e := obj.getFieldAsReference(fieldName)
 	if e != nil {
 		return e
 	}
@@ -199,7 +197,7 @@ func (w *Walker) AdvanceFromRefField(fieldName string, p interface{}) error {
 		return e
 	}
 	// Add to internal stack.
-	newObj := obj.Generate(v.Schema().Reference(), p, nil, fieldName, -1)
+	newObj := obj.generate(v.Schema().Reference(), p, fieldName, -1)
 	w.stack = append(w.stack, newObj)
 	return nil
 }
@@ -207,7 +205,7 @@ func (w *Walker) AdvanceFromRefField(fieldName string, p interface{}) error {
 // AdvanceFromDynamicField advances from a field of name 'prevFieldName' and type 'skyobject.Dynamic'.
 // No Finder is required as field is a single reference.
 // Input 'p' should be provided with a pointer to the object in which the chosen child object should deserialize to.
-func (w *Walker) AdvanceFromDynamicField(fieldName string, p interface{}) error {
+func (w *RootWalker) AdvanceFromDynamicField(fieldName string, p interface{}) error {
 	gMux.Lock()
 	defer gMux.Unlock()
 
@@ -225,7 +223,7 @@ func (w *Walker) AdvanceFromDynamicField(fieldName string, p interface{}) error 
 
 	// Obtain data from top-most object.
 	// Obtain field's value and schema name.
-	fDyn, e := obj.GetFieldAsDynamic(fieldName)
+	fDyn, e := obj.getFieldAsDynamic(fieldName)
 	if e != nil {
 		return e
 	}
@@ -241,18 +239,18 @@ func (w *Walker) AdvanceFromDynamicField(fieldName string, p interface{}) error 
 		return e
 	}
 	// Add to internal stack.
-	newObj := obj.Generate(v.Schema().Reference(), p, nil, fieldName, -1)
+	newObj := obj.generate(v.Schema().Reference(), p, fieldName, -1)
 	w.stack = append(w.stack, newObj)
 	return nil
 }
 
 // Retreat retreats one from the internal stack.
-func (w *Walker) Retreat() {
+func (w *RootWalker) Retreat() {
 	switch w.Size() {
 	case 0:
 		return
 	case 1:
-		w.stack = []*Obj{}
+		w.stack = []*wrappedObj{}
 	default:
 		w.stack = w.stack[:len(w.stack)-1]
 		w.stack[len(w.stack)-1].next = nil
@@ -262,7 +260,7 @@ func (w *Walker) Retreat() {
 // AppendToRefsField appends a reference to references field 'fieldName' of top-most object. The new reference will be
 // generated automatically by saving the object which 'p' points to. This recursively replaces all the associated
 // "references" of the object tree and hence, changes the root.
-func (w *Walker) AppendToRefsField(fieldName string, p interface{}) error {
+func (w *RootWalker) AppendToRefsField(fieldName string, p interface{}) error {
 	gMux.Lock()
 	defer gMux.Unlock()
 
@@ -276,17 +274,17 @@ func (w *Walker) AppendToRefsField(fieldName string, p interface{}) error {
 	nRef := w.c.Save(p)
 
 	// Edit top-most object.
-	tRefs, _, e := tObj.GetFieldAsReferences(fieldName)
+	tRefs, _, e := tObj.getFieldAsReferences(fieldName)
 	if e != nil {
 		return e
 	}
 	tRefs = append(tRefs, nRef)
-	if e := tObj.ReplaceReferencesField(fieldName, tRefs); e != nil {
+	if e := tObj.replaceReferencesField(fieldName, tRefs); e != nil {
 		return e
 	}
 
 	// Recursively save.
-	_, e = tObj.Save()
+	_, e = tObj.save()
 	return e
 }
 
@@ -297,7 +295,7 @@ func (w *Walker) AppendToRefsField(fieldName string, p interface{}) error {
 // ReplaceInRefField replaces the reference field of the top-most object with a new reference; one that is automatically
 // generated when saving the object 'p' points to, in the container. This recursively replaces all the associated
 // "references" of the object tree and hence, changes the root.
-func (w *Walker) ReplaceInRefField(fieldName string, p interface{}) error {
+func (w *RootWalker) ReplaceInRefField(fieldName string, p interface{}) error {
 	gMux.Lock()
 	defer gMux.Unlock()
 
@@ -309,18 +307,18 @@ func (w *Walker) ReplaceInRefField(fieldName string, p interface{}) error {
 
 	// Save new obj.
 	nRef := w.c.Save(p)
-	if e := tObj.ReplaceReferenceField(fieldName, nRef); e != nil {
+	if e := tObj.replaceReferenceField(fieldName, nRef); e != nil {
 		return e
 	}
 
 	// Recursively save.
-	_, e = tObj.Save()
+	_, e = tObj.save()
 	return e
 }
 
 // ReplaceInDynamicField functions the same as 'ReplaceInRefField'. However, it replaces a dynamic reference field other
 // than a static reference field.
-func (w *Walker) ReplaceInDynamicField(fieldName string, p interface{}) error {
+func (w *RootWalker) ReplaceInDynamicField(fieldName string, p interface{}) error {
 	gMux.Lock()
 	defer gMux.Unlock()
 
@@ -332,16 +330,16 @@ func (w *Walker) ReplaceInDynamicField(fieldName string, p interface{}) error {
 
 	// Save new object.
 	nDyn := w.c.Dynamic(p)
-	if e := tObj.ReplaceDynamicField(fieldName, nDyn); e != nil {
+	if e := tObj.replaceDynamicField(fieldName, nDyn); e != nil {
 		return e
 	}
 
 	// Recursively save.
-	_, e = tObj.Save()
+	_, e = tObj.save()
 	return e
 }
 
-func (w *Walker) String() (out string) {
+func (w *RootWalker) String() (out string) {
 	tabs := func(n int) {
 		for i := 0; i < n; i++ {
 			out += "\t"

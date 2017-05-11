@@ -88,7 +88,7 @@ func TestNewWalker(t *testing.T) {
 	pk, sk := genKeyPair()
 	c := newContainer()
 	fillContainer1(c, pk, sk)
-	_, e := NewWalker(c, pk, sk)
+	_, e := NewRootWalker(c, pk, sk)
 	if e != nil {
 		t.Error("failed to create walker;", e)
 	}
@@ -98,7 +98,7 @@ func TestWalker_AdvanceFromRoot(t *testing.T) {
 	pk, sk := genKeyPair()
 	c := newContainer()
 	fillContainer1(c, pk, sk)
-	w, _ := NewWalker(c, pk, sk)
+	w, _ := NewRootWalker(c, pk, sk)
 
 	board := &Board{}
 	e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
@@ -119,7 +119,7 @@ func TestWalker_AdvanceFromRefsField(t *testing.T) {
 	pk, sk := genKeyPair()
 	c := newContainer()
 	fillContainer1(c, pk, sk)
-	w, _ := NewWalker(c, pk, sk)
+	w, _ := NewRootWalker(c, pk, sk)
 
 	board := &Board{}
 	thread := &Thread{}
@@ -163,7 +163,7 @@ func TestWalker_AdvanceFromRefField(t *testing.T) {
 	pk, sk := genKeyPair()
 	c := newContainer()
 	fillContainer1(c, pk, sk)
-	w, _ := NewWalker(c, pk, sk)
+	w, _ := NewRootWalker(c, pk, sk)
 
 	board := &Board{}
 	thread := &Thread{}
@@ -204,7 +204,7 @@ func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 		pk, sk := genKeyPair()
 		c := newContainer()
 		fillContainer1(c, pk, sk)
-		w, _ := NewWalker(c, pk, sk)
+		w, _ := NewRootWalker(c, pk, sk)
 
 		board := &Board{}
 		post := &Post{}
@@ -233,7 +233,7 @@ func TestWalker_AdvanceFromDynamicField(t *testing.T) {
 		pk, sk := genKeyPair()
 		c := newContainer()
 		fillContainer1(c, pk, sk)
-		w, _ := NewWalker(c, pk, sk)
+		w, _ := NewRootWalker(c, pk, sk)
 
 		board := &Board{}
 		person := &Person{}
@@ -264,7 +264,7 @@ func TestWalker_AppendToRefsField(t *testing.T) {
 	pk, sk := genKeyPair()
 	c := newContainer()
 	fillContainer1(c, pk, sk)
-	w, _ := NewWalker(c, pk, sk)
+	w, _ := NewRootWalker(c, pk, sk)
 
 	board := &Board{}
 	e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
@@ -303,7 +303,7 @@ func TestWalker_ReplaceInRefField(t *testing.T) {
 		pk, sk := genKeyPair()
 		c := newContainer()
 		fillContainer1(c, pk, sk)
-		w, _ := NewWalker(c, pk, sk)
+		w, _ := NewRootWalker(c, pk, sk)
 
 		board := &Board{}
 		e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
@@ -329,7 +329,7 @@ func TestWalker_ReplaceInRefField(t *testing.T) {
 		pk, sk := genKeyPair()
 		c := newContainer()
 		fillContainer1(c, pk, sk)
-		w, _ := NewWalker(c, pk, sk)
+		w, _ := NewRootWalker(c, pk, sk)
 
 		board := &Board{}
 		e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
@@ -382,7 +382,7 @@ func TestWalker_ReplaceInDynamicField(t *testing.T) {
 		pk, sk := genKeyPair()
 		c := newContainer()
 		fillContainer1(c, pk, sk)
-		w, _ := NewWalker(c, pk, sk)
+		w, _ := NewRootWalker(c, pk, sk)
 
 		board := &Board{}
 		e := w.AdvanceFromRoot(board, func(v *skyobject.Value) (chosen bool) {
